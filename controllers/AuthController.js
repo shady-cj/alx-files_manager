@@ -1,3 +1,4 @@
+import sha1 from 'sha1';
 import { v4 } from 'uuid';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
@@ -11,7 +12,7 @@ class AuthController {
     const email = arrayOfCreds[0];
     const password = arrayOfCreds.slice(1).join('');
     const userCollection = dbClient.db.collection('users');
-    const retrieveUser = await userCollection.findOne({ email, password });
+    const retrieveUser = await userCollection.findOne({ email, password: sha1(password) });
     if (!retrieveUser) {
       res.status(401).json({ error: 'Unauthorized' });
       return;

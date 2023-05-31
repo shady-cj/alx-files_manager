@@ -4,7 +4,7 @@ import loadRoutes from './routes';
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5110;
 loadRoutes(app);
 
 app.listen(PORT, () => {
