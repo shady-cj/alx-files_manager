@@ -4,8 +4,14 @@ import dbClient from '../utils/db';
 class UsersController {
   static async postNew(req, res) {
     const { email, password } = req.body;
-    if (!email) res.status(400).json({ error: 'Email missing' });
-    if (!password) res.status(400).json({ error: 'Password missing' });
+    if (!email) {
+      res.status(400).json({ error: 'Email missing' });
+      return;
+    }
+    if (!password) {
+      res.status(400).json({ error: 'Password missing' });
+      return;
+    }
     const userCollection = dbClient.db.collection('users');
     const userCount = await userCollection.find({ email }).count();
     if (userCount > 0) {
