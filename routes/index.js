@@ -8,6 +8,6 @@ const loadRoutes = (app) => {
   app.post('/users', UsersController.postNew);
   app.get('/connect', AuthController.getConnect);
   app.get('/disconnect', AuthController.getDisconnect);
-  app.get('/users/me', UsersController.getMe)
+  app.get('/users/me', UsersController.getMe);
 };
 export default loadRoutes;
