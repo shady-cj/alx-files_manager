@@ -7,7 +7,6 @@ class RedisClient {
     this.client.on('error', (err) => console.log(`Redis client not connected to the server: ${err}`));
   }
   isAlive() {
-    console.log(this.client)
     return this.client.connected;
   }
   async get(key) {
