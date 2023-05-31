@@ -1,10 +1,10 @@
-import { MongoClient } from "mongodb";
+import { MongoClient } from 'mongodb';
 
 class DBClient {
   constructor() {
-    const host = process.env["DB_HOST"] || "localhost";
-    const port = process.env["DB_PORT"] || 27017;
-    const database = process.env["DB_DATABASE"] || 'files_manager';
+    const host = process.env.DB_HOST || 'localhost';
+    const port = process.env.DB_PORT || 27017;
+    const database = process.env.DB_DATABASE || 'files_manager';
     const url = `mongodb://${host}:${port}/${database}`;
     this.isConnected = false;
     this.db = null;
@@ -12,7 +12,7 @@ class DBClient {
       if (err) console.log(err);
       this.isConnected = true;
       this.db = db.db();
-    })
+    });
   }
 
   isAlive() {
@@ -20,17 +20,21 @@ class DBClient {
   }
 
   async nbUsers() {
+    let count = null;
     if (this.db) {
-      const users = this.db.collection('users')
-      return await users.find().count();
+      const users = this.db.collection('users');
+      count = await users.find().count();
     }
+    return count;
   }
 
   async nbFiles() {
+    let count = null;
     if (this.db) {
-      const files = this.db.collection('files')
-      return await files.find().count();
+      const files = this.db.collection('files');
+      count = await files.find().count();
     }
+    return count;
   }
 }
 
