@@ -150,7 +150,8 @@ class FilesController {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const retrieveFiles = await dbClient.db.collection('files').find({ parentId: parentId || '0' }).skip((page || 0) * 20).limit(20);
+    const retrieveFiles = await dbClient.db.collection('files').find({ parentId: parentId || '0' }).skip((page || 0) * 20).limit(20)
+      .toArray();
     // Using aggregate query to paginate
     // const retrieveFiles = await dbClient.db.collection('files').aggregate([
     //   { '$match': { parentId: parentId || '0' }},
@@ -158,7 +159,7 @@ class FilesController {
     //   { '$limit': 20 }
     // ]).toArray();
     res.status(200).json(
-      retrieveFiles.toArray().map((item) => ({
+      retrieveFiles.map((item) => ({
         id: item._id,
         userId: item.userId,
         name: item.name,
