@@ -1,4 +1,5 @@
 import { ObjectId } from 'mongodb';
+import mime from 'mime-types';
 import fs from 'fs';
 import { v4 } from 'uuid';
 import dbClient from '../utils/db';
@@ -52,18 +53,6 @@ class FilesController {
         return;
       }
     }
-
-    const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath);
-    }
-    const filePath = `${folderPath}/${v4()}`;
-    const decodedData = Buffer.from(data, 'base64').toString('utf-8');
-    fs.writeFile(filePath, decodedData, (err) => {
-      if (err) {
-        res.status(400).json({ error: 'Couldn\'t write to file' });
-      }
-    });
     if (type === 'folder') {
       await fileCollection.insertOne({
         userId: getUserId,
@@ -73,6 +62,17 @@ class FilesController {
         parentId: parentId || '0',
       });
     } else {
+      const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath);
+      }
+      const filePath = `${folderPath}/${v4()}`;
+      const decodedData = Buffer.from(data, 'base64').toString('utf-8');
+      fs.writeFile(filePath, decodedData, (err) => {
+        if (err) {
+          res.status(400).json({ error: 'Couldn\'t write to file' });
+        }
+      });
       await fileCollection.insertOne({
         userId: getUserId,
         name,
@@ -82,6 +82,7 @@ class FilesController {
         localPath: filePath,
       });
     }
+
     const newFile = await fileCollection.findOne({
       name,
       userId: getUserId,
@@ -238,6 +239,46 @@ class FilesController {
       isPublic: updatedFile.isPublic,
       parentId: updatedFile.parentId,
     });
+  }
+
+  static async getFile(req, res) {
+    const { id } = req.params;
+    const token = req.headers['x-token'];
+    if (!token) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const getUserId = await redisClient.get(`auth_${token}`);
+    if (!getUserId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const retrieveUser = await dbClient.db.collection('users').findOne({ _id: new ObjectId(getUserId) });
+    const retrieveFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(id) });
+    if (!retrieveFile) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    if (retrieveFile.isPublic === false && retrieveUser) {
+      if (retrieveUser._id != retrieveFile.userId) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+    }
+
+    if (retrieveFile.type === 'folder') {
+      res.status(400).json({ error: 'A folder doesn\'t have content' });
+      return;
+    }
+    if (!fs.existsSync(retrieveFile.localPath)) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const contentType = mime.contentType(retrieveFile.localPath);;
+    res.setHeader('content-type', contentType);
+    const content = await fs.promises.readFile(retrieveFile.localPath);
+    res.send(content);
   }
 }
 export default FilesController;
