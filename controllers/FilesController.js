@@ -1,4 +1,5 @@
 import { ObjectId } from 'mongodb';
+import Queue from 'bull';
 import mime from 'mime-types';
 import fs from 'fs';
 import { v4 } from 'uuid';
@@ -53,6 +54,7 @@ class FilesController {
         return;
       }
     }
+    let newFile;
     if (type === 'folder') {
       await fileCollection.insertOne({
         userId: getUserId,
@@ -61,13 +63,19 @@ class FilesController {
         isPublic: isPublic || false,
         parentId: parentId || '0',
       });
+      newFile = await fileCollection.findOne({
+        name,
+        userId: getUserId,
+        type,
+      });
     } else {
       const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath);
       }
       const filePath = `${folderPath}/${v4()}`;
-      const decodedData = Buffer.from(data, 'base64').toString('utf-8');
+      
+      const decodedData = Buffer.from(data, 'base64');
       fs.writeFile(filePath, decodedData, (err) => {
         if (err) {
           res.status(400).json({ error: 'Couldn\'t write to file' });
@@ -81,17 +89,25 @@ class FilesController {
         parentId: parentId || '0',
         localPath: filePath,
       });
+      newFile = await fileCollection.findOne({
+        name,
+        userId: getUserId,
+        type,
+        localPath: filePath,
+      });
+      if (!newFile) {
+        res.status(400).json({ error: 'No such file in the db' });
+        return;
+      }
+      const queue = new Queue('fileQueue');
+      try {
+        await queue.add({ userId: getUserId, fileId: newFile._id.toString() })
+      } catch (err) {
+        console.log(err)
+      }  
     }
 
-    const newFile = await fileCollection.findOne({
-      name,
-      userId: getUserId,
-      type,
-    });
-    if (!newFile) {
-      res.status(400).json({ error: 'No such file in the db' });
-      return;
-    }
+    
     res.status(201).json({
       id: newFile._id,
       userId: newFile.userId,
@@ -244,6 +260,7 @@ class FilesController {
   static async getFile(req, res) {
     const { id } = req.params;
     const token = req.headers['x-token'];
+    const size = req.query.size;
     if (!token) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
@@ -273,14 +290,18 @@ class FilesController {
       res.status(400).json({ error: 'A folder doesn\'t have content' });
       return;
     }
-    if (!fs.existsSync(retrieveFile.localPath)) {
+    let path;
+    if (size) path = `${retrieveFile.localPath}_${size}`;
+    else path = retrieveFile.localPath;
+
+    if (!fs.existsSync(path)) {
       res.status(404).json({ error: 'Not found' });
       return;
     }
 
-    const contentType = mime.contentType(retrieveFile.localPath);;
+    const contentType = mime.contentType(path);;
     res.setHeader('content-type', contentType);
-    const content = await fs.promises.readFile(retrieveFile.localPath);
+    const content = await fs.promises.readFile(path);
     res.send(content);
   }
 }
